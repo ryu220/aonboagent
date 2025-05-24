@@ -5,12 +5,34 @@ from datetime import datetime
 import json
 from typing import Dict, List, Any, Optional
 
+# デバッグ情報を表示
+st.write("Python version:", sys.version)
+st.write("Current working directory:", os.getcwd())
+
+# インストール済みパッケージを確認
+try:
+    import pkg_resources
+    installed_packages = [d.project_name for d in pkg_resources.working_set]
+    if "google-generativeai" in installed_packages:
+        st.success("google-generativeai is installed")
+    else:
+        st.error("google-generativeai is NOT installed")
+        st.write("Installed packages:", sorted(installed_packages)[:20])  # 最初の20個を表示
+except Exception as e:
+    st.error(f"Error checking packages: {e}")
+
+# Google Generative AIをインポート
 try:
     import google.generativeai as genai
+    st.success("Successfully imported google.generativeai")
 except ImportError as e:
     st.error(f"Failed to import google.generativeai: {e}")
-    st.error("Please ensure google-generativeai is installed: pip install google-generativeai")
-    sys.exit(1)
+    st.error("Trying alternative import...")
+    try:
+        import google.generativeai as genai
+    except Exception as e2:
+        st.error(f"Second attempt failed: {e2}")
+        genai = None
 
 from streamlit_option_menu import option_menu
 import requests
