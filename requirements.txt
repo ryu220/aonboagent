@@ -1,12 +1,1 @@
-streamlit
-google-generativeai
-streamlit-option-menu
-requests
-pandas
-python-dotenv
-pyyaml
-plotly
-protobuf
-grpcio
-google-api-core
-google-auth
+streamlit==1.29.0
