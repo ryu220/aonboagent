@@ -1,0 +1,52 @@
+# YouTube Workflow AI Assistant
+
+YouTubeコンテンツ制作を支援する包括的なワークフローアプリケーション
+
+## 機能
+
+- **チャンネルコンセプト設計**: SEOキーワードとペルソナに基づいたチャンネル戦略立案
+- **動画マーケティング支援**: サムネイル文言とタイトルの最適化
+- **動画企画生成＆SEO最適化**: キーワードに基づいた動画企画の大量生成
+- **YouTube Shorts企画生成**: ショート動画向けの企画案を大量生成・評価
+- **Shorts台本生成**: トレンドを踏まえたショート動画台本作成
+- **コンテンツスコアリング**: 既存・新規コンテンツの品質評価と改善提案
+- **キーワード戦略シミュレーション**: 包括的なキーワード戦略の立案
+- **長尺動画台本生成**: 様々なスタイルの長尺動画台本作成
+
+## セットアップ
+
+1. 依存関係のインストール:
+```bash
+pip install -r requirements.txt
+```
+
+2. 環境変数の設定（.envファイルを作成）:
+```
+GEMINI_API_KEY=your_gemini_api_key_here
+KEYWORD_TOOL_API_KEY=your_keyword_tool_api_key_here
+```
+
+3. アプリケーションの起動:
+```bash
+streamlit run app.py
+```
+
+## 使用方法
+
+1. ブラウザで表示されるURLにアクセス
+2. 8つのワークフローから目的に合ったものを選択
+3. ステップバイステップで必要な情報を入力
+4. AIが生成した結果を確認・ダウンロード
+
+## 必要なAPIキー
+
+- **Gemini API Key**: Google AI Studioから取得（必須）
+- **Keyword Tool API Key**: keywordtool.ioから取得（オプション）
+
+## 技術スタック
+
+- Streamlit
+- Google Generative AI (Gemini-2.0-flash-exp)
+- Pandas
+- Plotly
+- Python 3.8+

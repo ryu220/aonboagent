@@ -1,12 +1,20 @@
 import streamlit as st
-import google.generativeai as genai
+import os
+import sys
+from datetime import datetime
+import json
+from typing import Dict, List, Any, Optional
+
+try:
+    import google.generativeai as genai
+except ImportError as e:
+    st.error(f"Failed to import google.generativeai: {e}")
+    st.error("Please ensure google-generativeai is installed: pip install google-generativeai")
+    sys.exit(1)
+
 from streamlit_option_menu import option_menu
 import requests
-import json
-import os
-from datetime import datetime
 import yaml
-from typing import Dict, List, Any, Optional
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -140,16 +148,29 @@ class YouTubeWorkflowApp:
         
     def setup_apis(self):
         """APIの初期設定"""
-        # Gemini API setup
-        gemini_api_key = os.getenv("GEMINI_API_KEY")
+        # Gemini API setup - Streamlit CloudのSecretsまたは環境変数から取得
+        gemini_api_key = None
+        
+        # Streamlit Cloudの場合
+        if "GEMINI_API_KEY" in st.secrets:
+            gemini_api_key = st.secrets["GEMINI_API_KEY"]
+        # ローカル環境の場合
+        else:
+            gemini_api_key = os.getenv("GEMINI_API_KEY")
+            
         if gemini_api_key:
             genai.configure(api_key=gemini_api_key)
             self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
         else:
             self.model = None
+            st.warning("⚠️ Gemini APIキーが設定されていません。アプリの機能が制限されます。")
             
         # Keyword Tool API setup
-        self.keyword_api_key = os.getenv("KEYWORD_TOOL_API_KEY")
+        if "KEYWORD_TOOL_API_KEY" in st.secrets:
+            self.keyword_api_key = st.secrets["KEYWORD_TOOL_API_KEY"]
+        else:
+            self.keyword_api_key = os.getenv("KEYWORD_TOOL_API_KEY")
+            
         self.keyword_api_url = "https://api.keywordtool.io/v2/search/suggestions/youtube"
         
     def get_keywords(self, keyword: str, country: str = "jp", language: str = "ja") -> List[Dict]:
