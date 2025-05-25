@@ -147,6 +147,19 @@ st.markdown("""
         background: #00c8ff !important;
         color: #000000 !important;
     }
+
+    /* ワークフローカード内のボタン */
+    .workflow-card .stButton>button {
+        background: #ffffff !important;
+        color: #000000 !important;
+        border: 1px solid #00c8ff !important;
+        transition: all 0.2s ease-in-out;
+    }
+    .workflow-card .stButton>button:hover {
+        background: #00c8ff !important;
+        color: #000000 !important;
+        border: 1px solid #00c8ff !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
