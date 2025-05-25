@@ -73,27 +73,51 @@ if 'workflow_step' not in st.session_state:
 # Custom CSS for better UI
 st.markdown("""
 <style>
+    /* ===== Futuristic Dark Theme ===== */
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&display=swap');
+
+    /* 全体背景と文字色 */
+    html, body, [data-testid="stAppViewContainer"], .stApp {
+        background: linear-gradient(145deg, #0a0a0a 0%, #11172b 50%, #000000 100%) !important;
+        color: #e0e0e0 !important;
+        font-family: 'Orbitron', sans-serif;
+    }
+
+    /* メインヘッダー */
     .main-header {
-        font-size: 2.5rem;
-        font-weight: bold;
-        color: #FF0000;
+        font-size: 2.8rem;
+        font-weight: 700;
+        color: #00c8ff;
         text-align: center;
         margin-bottom: 2rem;
+        letter-spacing: 1px;
     }
+
+    /* ワークフローカード */
     .workflow-card {
-        background-color: #f0f2f6;
+        background: rgba(30, 30, 45, 0.6);
+        backdrop-filter: blur(10px);
         padding: 1.5rem;
-        border-radius: 10px;
+        border-radius: 12px;
         margin-bottom: 1rem;
-        border-left: 4px solid #FF0000;
+        border-left: 4px solid #00c8ff;
+        transition: all 0.2s ease-in-out;
     }
+    .workflow-card:hover {
+        border-left: 4px solid #ff00ff;
+        transform: translateY(-3px);
+    }
+
+    /* 結果表示ボックス */
     .result-box {
-        background-color: #e8f4f8;
+        background: rgba(25, 25, 35, 0.7);
         padding: 1rem;
         border-radius: 8px;
+        border: 1px solid #00c8ff33;
         margin-top: 1rem;
-        border: 1px solid #b8d4e3;
     }
+
+    /* ステップインジケータ */
     .step-indicator {
         display: flex;
         justify-content: space-between;
@@ -103,18 +127,25 @@ st.markdown("""
         flex: 1;
         text-align: center;
         padding: 0.5rem;
-        background-color: #e0e0e0;
+        background: #333333;
         margin: 0 0.25rem;
         border-radius: 5px;
         font-weight: bold;
+        color: #e0e0e0;
     }
     .step.active {
-        background-color: #FF0000;
-        color: white;
+        background: #00c8ff;
+        color: #000000;
     }
     .step.completed {
-        background-color: #4CAF50;
-        color: white;
+        background: #26d07c;
+        color: #000000;
+    }
+
+    /* プライマリボタン色 */
+    button[kind="primary"] {
+        background: #00c8ff !important;
+        color: #000000 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -128,20 +159,20 @@ WORKFLOWS = {
         "steps": ["商品情報入力", "キーワード分析", "ペルソナ設計", "コンセプト生成"]
     },
     "video_marketing": {
-        "name": "動画マーケティング支援",
-        "description": "動画の内容からサムネイル文言とタイトルを生成",
+        "name": "サムネ＆タイトル作成",
+        "description": "動画の内容から最適なサムネイルとタイトルを生成",
         "icon": "🎨",
         "steps": ["動画内容入力", "ペルソナ分析", "サムネ・タイトル生成", "最適化"]
     },
     "video_planning": {
-        "name": "動画企画生成＆SEO最適化",
-        "description": "SEOキーワードに基づいた動画企画とタイトル案を生成",
+        "name": "YouTube SEO企画長尺生成",
+        "description": "長尺動画をYouTube SEOに最適化した企画とタイトル案を生成",
         "icon": "📋",
         "steps": ["キーワード入力", "競合分析", "企画生成", "評価・選定"]
     },
     "shorts_planning": {
-        "name": "YouTube Shorts企画生成",
-        "description": "ショート動画向けの企画案を大量生成し、ランキング評価",
+        "name": "YouTube SEO Shorts企画生成",
+        "description": "ショート動画向け企画をYouTube SEOキーワード観点で生成し、ランキング評価",
         "icon": "📱",
         "steps": ["キーワード入力", "競合分析", "企画生成", "ランキング評価"]
     },
