@@ -2,6 +2,7 @@ streamlit
 google-generativeai
 streamlit-option-menu
 requests
+beautifulsoup4
 pandas
 python-dotenv
 pyyaml

@@ -448,26 +448,71 @@ def handle_channel_concept_workflow(app: YouTubeWorkflowApp):
                 with st.spinner("サービスページを分析中..."):
                     # サービスURLからコンテンツを取得
                     if service_url and service_url.startswith("http"):
-                        analysis_prompt = f"""
-                        以下のサービスページの内容を分析してください：
-                        URL: {service_url}
-                        
-                        分析項目：
-                        1. 提供されているサービス・商品の概要
-                        2. ターゲット顧客層
-                        3. 主要な価値提案
-                        4. 競合優位性
-                        5. YouTube検索に使われそうなキーワード候補（20個）
-                        """
-                        
-                        # WebFetchを使用してサービスページを分析
+                        # WebFetchを使用してサービスページを読み取る
                         try:
-                            # この部分でWebFetch機能を使用
-                            # 実際のWebFetch実装がある場合はここで使用
-                            service_analysis = app.generate_with_gemini(analysis_prompt)
-                            st.session_state.current_data['service_analysis'] = service_analysis
-                        except:
-                            st.session_state.current_data['service_analysis'] = "サービス分析を実行"
+                            # WebFetch関数を定義していない場合の代替実装
+                            fetch_prompt = f"""
+                            以下のURLのWebページにアクセスして、内容を詳しく分析してください：
+                            {service_url}
+                            
+                            この分析は学習塾や教育サービスのページの可能性が高いです。
+                            ページの実際の内容を正確に読み取り、以下を抽出してください：
+                            
+                            1. サービス名・会社名
+                            2. 提供しているサービスの詳細（学習塾なら科目、対象学年など）
+                            3. 特徴・強み
+                            4. 料金体系
+                            5. 対象顧客（生徒・保護者など）
+                            """
+                            
+                            # requestsを使用してページ内容を取得
+                            import requests
+                            from bs4 import BeautifulSoup
+                            
+                            try:
+                                response = requests.get(service_url, timeout=10)
+                                soup = BeautifulSoup(response.text, 'html.parser')
+                                
+                                # タイトルとメタ情報を抽出
+                                title = soup.find('title').text if soup.find('title') else ''
+                                meta_desc = soup.find('meta', {'name': 'description'})
+                                description = meta_desc.get('content', '') if meta_desc else ''
+                                
+                                # 本文テキストを抽出（最初の1000文字）
+                                text_content = soup.get_text()[:1000]
+                                
+                                analysis_prompt = f"""
+                                Webページの分析結果：
+                                タイトル: {title}
+                                説明: {description}
+                                本文抜粋: {text_content}
+                                
+                                上記の内容から、このサービスについて分析してください：
+                                1. サービスの種類（学習塾、教育サービスなど具体的に）
+                                2. 提供価値
+                                3. ターゲット顧客
+                                4. YouTube動画で訴求すべきポイント
+                                5. 関連するキーワード候補20個
+                                """
+                                
+                                service_analysis = app.generate_with_gemini(analysis_prompt)
+                                st.session_state.current_data['service_analysis'] = service_analysis
+                                
+                            except Exception as e:
+                                st.warning(f"ページの読み取りに失敗しました: {e}")
+                                # URLが読み取れない場合は、商品説明から分析
+                                fallback_prompt = f"""
+                                商品名: {product_name}
+                                説明: {product_description}
+                                
+                                上記の情報から推測して分析してください。
+                                """
+                                service_analysis = app.generate_with_gemini(fallback_prompt)
+                                st.session_state.current_data['service_analysis'] = service_analysis
+                                
+                        except Exception as e:
+                            st.error(f"サービス分析エラー: {e}")
+                            st.session_state.current_data['service_analysis'] = "分析失敗"
                     
                     # 商品情報とサービス分析から自動的にキーワードを抽出
                     keyword_extraction_prompt = f"""
@@ -558,8 +603,15 @@ def handle_channel_concept_workflow(app: YouTubeWorkflowApp):
                 
                 result = app.generate_with_gemini(prompt)
                 st.session_state.current_data['keywords_analysis'] = result
-                st.session_state.current_data['keywords'] = all_keywords[:3]  # Top 3 for next step
-                st.session_state.current_data['all_keywords'] = all_keywords[:30]  # 全キーワードデータを保存
+                # キーワードデータを正しく保存
+                if all_keywords and len(all_keywords) > 0:
+                    st.session_state.current_data['keywords'] = all_keywords[:3] if len(all_keywords) >= 3 else all_keywords
+                    st.session_state.current_data['all_keywords'] = all_keywords[:30] if len(all_keywords) >= 30 else all_keywords
+                    st.session_state.current_data['top_keywords_text'] = ', '.join([kw.get('keyword', '') for kw in all_keywords[:3] if isinstance(kw, dict)])
+                else:
+                    st.session_state.current_data['keywords'] = []
+                    st.session_state.current_data['all_keywords'] = []
+                    st.session_state.current_data['top_keywords_text'] = ''
                 
                 # 結果表示
                 st.markdown('<div class="result-box">', unsafe_allow_html=True)
@@ -947,17 +999,40 @@ def handle_video_marketing_workflow(app: YouTubeWorkflowApp):
 def handle_video_planning_workflow(app: YouTubeWorkflowApp):
     """動画企画生成ワークフロー"""
     if st.session_state.workflow_step == 0:
-        # Step 1: キーワード入力
-        st.markdown("### Step 1: キーワード入力")
+        # Step 1: データ活用と入力
+        st.markdown("### Step 1: 企画生成の基本情報")
+        
+        # 既存データの確認と自動設定
+        if 'keywords' in st.session_state.current_data or 'top_keywords_text' in st.session_state.current_data:
+            st.success("✅ チャンネルコンセプト設計で選定されたキーワードを検出しました")
+            
+            # 選定済みキーワードを表示
+            with st.expander("📊 選定済みキーワード", expanded=True):
+                if 'keywords_analysis' in st.session_state.current_data:
+                    st.write("**キーワード分析結果:**")
+                    st.write(st.session_state.current_data['keywords_analysis'][:500] + "...")
+                
+                top_keywords = st.session_state.current_data.get('top_keywords_text', '')
+                if top_keywords:
+                    st.info(f"**最重要キーワード:** {top_keywords}")
+        
+        # 既存データからの自動入力
+        default_keyword = st.session_state.current_data.get('top_keywords_text', '').split(',')[0].strip() if st.session_state.current_data.get('top_keywords_text') else ""
+        default_channel = st.session_state.current_data.get('product_name', '') if 'product_name' in st.session_state.current_data else ""
+        default_theme = st.session_state.current_data.get('concepts', '')[:200] + "..." if 'concepts' in st.session_state.current_data else ""
         
         col1, col2 = st.columns(2)
         with col1:
-            main_keyword = st.text_input("メインキーワード", value=st.session_state.current_data.get("main_keyword", ""))
+            main_keyword = st.text_input(
+                "メインキーワード（自動入力済み）", 
+                value=st.session_state.current_data.get("main_keyword", default_keyword),
+                help="チャンネルコンセプト設計で選定されたキーワードが自動入力されています"
+            )
             target_audience = st.text_input("ターゲット層", value=st.session_state.current_data.get("target_audience", ""))
         
         with col2:
-            channel_name = st.text_input("チャンネル名", value=st.session_state.current_data.get("channel_name", ""))
-            channel_theme = st.text_area("チャンネルテーマ・コンセプト", value=st.session_state.current_data.get("channel_theme", ""))
+            channel_name = st.text_input("チャンネル名", value=st.session_state.current_data.get("channel_name", default_channel))
+            channel_theme = st.text_area("チャンネルテーマ・コンセプト", value=st.session_state.current_data.get("channel_theme", default_theme))
         
         video_style = st.multiselect(
             "希望する動画スタイル",
