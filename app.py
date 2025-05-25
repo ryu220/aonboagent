@@ -131,7 +131,7 @@ st.markdown("""
         margin: 0 0.25rem;
         border-radius: 5px;
         font-weight: bold;
-        color: #e0e0e0;
+        color: #000000;
     }
     .step.active {
         background: #00c8ff;
@@ -159,6 +159,10 @@ st.markdown("""
         background: #00c8ff !important;
         color: #000000 !important;
         border: 1px solid #00c8ff !important;
+    }
+    /* 入力ウィジェットのラベルを白に */
+    .stTextInput label, .stTextArea label, label[data-testid="stWidgetLabel"] {
+        color: #ffffff !important;
     }
 </style>
 """, unsafe_allow_html=True)
