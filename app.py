@@ -182,7 +182,7 @@ WORKFLOWS = {
         "steps": ["動画内容入力", "ペルソナ分析", "サムネ・タイトル生成", "最適化"]
     },
     "video_planning": {
-        "name": "YouTube SEO企画長尺生成",
+        "name": "YouTube SEO長尺企画生成",
         "description": "長尺動画をYouTube SEOに最適化した企画とタイトル案を生成",
         "icon": "📋",
         "steps": ["キーワード入力", "競合分析", "企画生成", "評価・選定"]
