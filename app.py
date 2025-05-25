@@ -20,8 +20,8 @@ st.write("Current working directory:", os.getcwd())
 
 # インストール済みパッケージを確認
 try:
-    import pkg_resources
-    installed_packages = [d.project_name for d in pkg_resources.working_set]
+    from importlib.metadata import distributions
+    installed_packages = [dist.metadata['name'].lower() for dist in distributions()]
     if "google-generativeai" in installed_packages:
         st.success("google-generativeai is installed")
     else:
@@ -29,6 +29,12 @@ try:
         st.write("Installed packages:", sorted(installed_packages)[:20])  # 最初の20個を表示
 except Exception as e:
     st.error(f"Error checking packages: {e}")
+    # Fallback: 直接インポートを試す
+    try:
+        import google.generativeai
+        st.success("google-generativeai detected via direct import")
+    except ImportError:
+        st.error("google-generativeai is not available")
 
 # Google Generative AIをインポート
 try:
