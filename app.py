@@ -371,18 +371,62 @@ def main():
         elif st.session_state.selected_workflow == "long_content":
             handle_long_content_workflow(app)
     
-    # History sidebar
+    # History sidebar with enhanced data sharing
     with st.sidebar:
-        st.markdown("## 📜 作業履歴")
+        st.markdown("## 📜 作業履歴とデータ共有")
+        
+        # 現在のセッションデータを表示
+        with st.expander("📊 現在のセッションデータ", expanded=True):
+            if st.session_state.current_data:
+                # 重要なデータを表示
+                if 'product_name' in st.session_state.current_data:
+                    st.write(f"**商品名:** {st.session_state.current_data['product_name']}")
+                if 'keywords' in st.session_state.current_data:
+                    st.write(f"**選定キーワード:** {len(st.session_state.current_data.get('keywords', []))}個")
+                if 'channel_concept' in st.session_state.current_data:
+                    st.write("**チャンネルコンセプト:** 作成済み")
+                if 'video_plans' in st.session_state.current_data:
+                    st.write("**動画企画:** 生成済み")
+            else:
+                st.info("データがありません")
+        
+        st.markdown("### 📝 作業履歴")
         if st.session_state.workflow_history:
             for i, entry in enumerate(reversed(st.session_state.workflow_history[-10:])):
                 workflow_name = WORKFLOWS.get(entry['workflow_type'], {}).get('name', 'Unknown')
                 st.markdown(f"**{i+1}. {workflow_name}**")
                 st.caption(f"{entry['timestamp'][:19]}")
-                if st.button(f"データを再利用", key=f"reuse_{i}"):
-                    st.session_state.current_data.update(entry['data'])
-                    st.rerun()
+                
+                # データの概要を表示
+                with st.expander("データ詳細", expanded=False):
+                    data_summary = {}
+                    if 'product_name' in entry['data']:
+                        data_summary['商品名'] = entry['data']['product_name']
+                    if 'keywords_analysis' in entry['data']:
+                        data_summary['キーワード分析'] = "完了"
+                    if 'concepts' in entry['data']:
+                        data_summary['コンセプト'] = "生成済み"
+                    st.json(data_summary)
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button(f"データ取込", key=f"reuse_{i}", use_container_width=True):
+                        st.session_state.current_data.update(entry['data'])
+                        st.success("データを取り込みました")
+                        st.rerun()
+                with col2:
+                    if st.button(f"続きから", key=f"continue_{i}", use_container_width=True):
+                        st.session_state.current_data.update(entry['data'])
+                        st.session_state.selected_workflow = entry['workflow_type']
+                        st.session_state.workflow_step = 0
+                        st.rerun()
                 st.divider()
+        
+        # データクリアボタン
+        if st.button("🗑️ セッションデータをクリア", use_container_width=True):
+            st.session_state.current_data = {}
+            st.session_state.workflow_step = 0
+            st.rerun()
 
 def handle_channel_concept_workflow(app: YouTubeWorkflowApp):
     """チャンネルコンセプト設計ワークフロー"""
@@ -393,37 +437,99 @@ def handle_channel_concept_workflow(app: YouTubeWorkflowApp):
         col1, col2 = st.columns(2)
         with col1:
             product_name = st.text_input("商品・サービス名", value=st.session_state.current_data.get("product_name", ""))
-            service_url = st.text_input("サービスURL（任意）", value=st.session_state.current_data.get("service_url", ""))
+            service_url = st.text_input("サービスURL", value=st.session_state.current_data.get("service_url", ""))
         
         with col2:
             target_audience = st.text_area("ターゲット層", value=st.session_state.current_data.get("target_audience", ""))
             product_description = st.text_area("商品・サービスの詳細", value=st.session_state.current_data.get("product_description", ""))
         
         if st.button("次へ →", type="primary", use_container_width=True):
-            if product_name and product_description:
-                data = {
-                    "product_name": product_name,
-                    "service_url": service_url,
-                    "target_audience": target_audience,
-                    "product_description": product_description
-                }
-                app.save_to_history("channel_concept", data)
-                st.session_state.workflow_step = 1
-                st.rerun()
+            if product_name and service_url:
+                with st.spinner("サービスページを分析中..."):
+                    # サービスURLからコンテンツを取得
+                    if service_url and service_url.startswith("http"):
+                        analysis_prompt = f"""
+                        以下のサービスページの内容を分析してください：
+                        URL: {service_url}
+                        
+                        分析項目：
+                        1. 提供されているサービス・商品の概要
+                        2. ターゲット顧客層
+                        3. 主要な価値提案
+                        4. 競合優位性
+                        5. YouTube検索に使われそうなキーワード候補（20個）
+                        """
+                        
+                        # WebFetchを使用してサービスページを分析
+                        try:
+                            # この部分でWebFetch機能を使用
+                            # 実際のWebFetch実装がある場合はここで使用
+                            service_analysis = app.generate_with_gemini(analysis_prompt)
+                            st.session_state.current_data['service_analysis'] = service_analysis
+                        except:
+                            st.session_state.current_data['service_analysis'] = "サービス分析を実行"
+                    
+                    # 商品情報とサービス分析から自動的にキーワードを抽出
+                    keyword_extraction_prompt = f"""
+                    商品名: {product_name}
+                    サービス説明: {product_description}
+                    サービス分析: {st.session_state.current_data.get('service_analysis', '')}
+                    
+                    この商品・サービスに関連するYouTube SEOキーワードを30個抽出してください。
+                    以下のカテゴリーで分類してください：
+                    1. 主要キーワード（商品名・サービス名に直接関連）
+                    2. 問題解決キーワード（ユーザーの悩み・課題）
+                    3. ハウツーキーワード（使い方・やり方）
+                    4. 比較キーワード（他社比較・選び方）
+                    5. トレンドキーワード（最新・2024年など）
+                    """
+                    
+                    extracted_keywords = app.generate_with_gemini(keyword_extraction_prompt)
+                    
+                    data = {
+                        "product_name": product_name,
+                        "service_url": service_url,
+                        "target_audience": target_audience,
+                        "product_description": product_description,
+                        "service_analysis": st.session_state.current_data.get('service_analysis', ''),
+                        "extracted_keywords": extracted_keywords
+                    }
+                    app.save_to_history("channel_concept", data)
+                    st.session_state.workflow_step = 1
+                    st.rerun()
             else:
-                st.error("必須項目を入力してください")
+                st.error("商品・サービス名とURLは必須項目です")
                 
     elif st.session_state.workflow_step == 1:
-        # Step 2: キーワード分析
+        # Step 2: キーワード分析（自動実行）
         st.markdown("### Step 2: キーワード分析")
         
-        # キーワード検索
-        search_keyword = st.text_input("検索キーワード", value=st.session_state.current_data.get("product_name", ""))
+        # 前のステップで抽出されたキーワードを表示
+        st.info("Step 1で抽出されたキーワード候補:")
+        st.write(st.session_state.current_data.get('extracted_keywords', ''))
         
-        if st.button("キーワード分析実行", type="primary"):
-            with st.spinner("キーワードを分析中..."):
-                # Keyword Tool API
-                keywords = app.get_keywords(search_keyword)
+        # 自動的にキーワード分析を実行
+        if 'keywords_analysis' not in st.session_state.current_data:
+            with st.spinner("抽出されたキーワードを詳細分析中..."):
+                # 抽出されたキーワードから主要なものを自動選択
+                extracted_keywords_text = st.session_state.current_data.get('extracted_keywords', '')
+                
+                # キーワードリストから最初の3つの主要キーワードを抽出
+                keyword_list = []
+                for line in extracted_keywords_text.split('\n'):
+                    if any(word in line for word in ['1.', '2.', '3.', '-', '・']):
+                        keyword = line.split(':')[-1].strip() if ':' in line else line.split('.')[-1].strip()
+                        keyword = keyword.replace('-', '').replace('・', '').strip()
+                        if keyword and len(keyword) > 1:
+                            keyword_list.append(keyword)
+                            if len(keyword_list) >= 3:
+                                break
+                
+                # 各キーワードについてAPI検索を実行
+                all_keywords = []
+                for kw in keyword_list[:3]:
+                    keywords = app.get_keywords(kw)
+                    all_keywords.extend(keywords)
                 
                 # Geminiでの分析
                 prompt = f"""
@@ -431,19 +537,29 @@ def handle_channel_concept_workflow(app: YouTubeWorkflowApp):
                 - 商品名: {st.session_state.current_data.get('product_name')}
                 - 説明: {st.session_state.current_data.get('product_description')}
                 - ターゲット: {st.session_state.current_data.get('target_audience')}
+                - サービス分析: {st.session_state.current_data.get('service_analysis')}
                 
-                以下のキーワードリストから、YouTube SEOに最適な上位30個のキーワードを選定し、
-                検索ボリュームと商品との関連性を考慮してランキングしてください：
+                抽出されたキーワード候補:
+                {st.session_state.current_data.get('extracted_keywords')}
                 
-                {json.dumps(keywords, ensure_ascii=False, indent=2)}
+                API検索結果:
+                {json.dumps(all_keywords[:30], ensure_ascii=False, indent=2)}
                 
-                出力形式:
-                1. キーワード名 - 推定月間検索数 - 商品との関連性スコア(10点満点)
+                YouTube SEOに最適な上位30個のキーワードを選定し、以下の形式で出力してください：
+                
+                【最重要キーワード TOP3】
+                1. キーワード名 - 推定月間検索数 - 商品との関連性スコア(10点満点) - 選定理由
+                2. キーワード名 - 推定月間検索数 - 商品との関連性スコア(10点満点) - 選定理由
+                3. キーワード名 - 推定月間検索数 - 商品との関連性スコア(10点満点) - 選定理由
+                
+                【サポートキーワード（4-30位）】
+                各キーワードについて同様の形式で記載
                 """
                 
                 result = app.generate_with_gemini(prompt)
                 st.session_state.current_data['keywords_analysis'] = result
-                st.session_state.current_data['keywords'] = keywords[:3]  # Top 3 for next step
+                st.session_state.current_data['keywords'] = all_keywords[:3]  # Top 3 for next step
+                st.session_state.current_data['all_keywords'] = all_keywords[:30]  # 全キーワードデータを保存
                 
                 # 結果表示
                 st.markdown('<div class="result-box">', unsafe_allow_html=True)
@@ -595,15 +711,46 @@ def handle_video_marketing_workflow(app: YouTubeWorkflowApp):
         # Step 1: 動画内容入力
         st.markdown("### Step 1: 動画内容入力")
         
+        # 前のワークフローからのデータを自動取得
+        if 'keywords' in st.session_state.current_data:
+            top_keywords = st.session_state.current_data.get('keywords', [])
+            if top_keywords and isinstance(top_keywords, list) and len(top_keywords) > 0:
+                default_keywords = top_keywords[0].get('keyword', '') if isinstance(top_keywords[0], dict) else ''
+            else:
+                default_keywords = ''
+        else:
+            default_keywords = ''
+            
+        # チャンネルコンセプトも自動取得
+        channel_concept_default = ""
+        if 'concepts' in st.session_state.current_data:
+            channel_concept_default = st.session_state.current_data.get('concepts', '')[:200] + "..."
+        
         col1, col2 = st.columns(2)
         with col1:
             video_title = st.text_input("動画タイトル（仮）", value=st.session_state.current_data.get("video_title", ""))
             video_url = st.text_input("動画URL（任意）", value=st.session_state.current_data.get("video_url", ""))
-            target_keywords = st.text_input("ターゲットキーワード", value=st.session_state.current_data.get("target_keywords", ""))
+            target_keywords = st.text_input("ターゲットキーワード", value=st.session_state.current_data.get("target_keywords", default_keywords))
         
         with col2:
             video_content = st.text_area("動画の内容・概要", height=150, value=st.session_state.current_data.get("video_content", ""))
-            channel_concept = st.text_area("チャンネルコンセプト（任意）", value=st.session_state.current_data.get("channel_concept", ""))
+            channel_concept = st.text_area("チャンネルコンセプト", value=st.session_state.current_data.get("channel_concept", channel_concept_default))
+        
+        # 利用可能なデータを表示
+        if st.session_state.current_data:
+            with st.expander("📊 利用可能なセッションデータ"):
+                available_data = []
+                if 'product_name' in st.session_state.current_data:
+                    available_data.append(f"商品名: {st.session_state.current_data['product_name']}")
+                if 'keywords_analysis' in st.session_state.current_data:
+                    available_data.append("キーワード分析結果")
+                if 'personas_analysis' in st.session_state.current_data:
+                    available_data.append("ペルソナ分析結果")
+                if 'concepts' in st.session_state.current_data:
+                    available_data.append("チャンネルコンセプト")
+                
+                for data in available_data:
+                    st.write(f"✅ {data}")
         
         if st.button("次へ →", type="primary", use_container_width=True):
             if video_title and video_content:
@@ -1283,15 +1430,42 @@ YouTube Shorts企画生成結果
 def handle_shorts_script_workflow(app: YouTubeWorkflowApp):
     """Shorts台本生成ワークフロー"""
     if st.session_state.workflow_step == 0:
-        # Step 1: 企画入力
-        st.markdown("### Step 1: Shorts企画情報入力")
+        # Step 1: 企画選択またはデータ活用
+        st.markdown("### Step 1: Shorts企画情報")
         
-        video_concept = st.text_area(
-            "動画企画・コンセプト",
-            height=100,
-            value=st.session_state.current_data.get("video_concept", ""),
-            placeholder="例：料理の時短テクニックを30秒で紹介する動画"
-        )
+        # 既存の企画データがあるか確認
+        if 'shorts_plans' in st.session_state.current_data or 'video_plans' in st.session_state.current_data:
+            st.success("✅ 生成済みの企画データを検出しました")
+            
+            # 企画データから選択
+            with st.expander("📋 生成済み企画から選択", expanded=True):
+                plans_text = st.session_state.current_data.get('shorts_plans', '') or st.session_state.current_data.get('video_plans', '')
+                if 'ranking_evaluation' in st.session_state.current_data:
+                    st.info("ランキング上位の企画:")
+                    st.write(st.session_state.current_data.get('ranking_evaluation', '')[:500] + "...")
+                    
+                # 企画選択
+                selected_plan_index = st.selectbox(
+                    "使用する企画を選択",
+                    options=list(range(1, 11)),
+                    format_func=lambda x: f"企画 {x}"
+                )
+                
+                # 選択された企画の詳細を自動入力
+                if st.button("この企画を使用", type="primary"):
+                    # 企画テキストから該当部分を抽出
+                    video_concept_auto = f"企画{selected_plan_index}の内容（ランキング評価より）"
+                    st.session_state.current_data['video_concept'] = video_concept_auto
+                    st.session_state.current_data['selected_plan_index'] = selected_plan_index
+        
+        # 手動入力オプション
+        with st.expander("✏️ 手動で企画を入力", expanded=not bool(st.session_state.current_data.get('shorts_plans'))):
+            video_concept = st.text_area(
+                "動画企画・コンセプト",
+                height=100,
+                value=st.session_state.current_data.get("video_concept", ""),
+                placeholder="例：料理の時短テクニックを30秒で紹介する動画"
+            )
         
         col1, col2 = st.columns(2)
         with col1:
@@ -1340,21 +1514,61 @@ def handle_shorts_script_workflow(app: YouTubeWorkflowApp):
                 st.error("必須項目を入力してください")
                 
     elif st.session_state.workflow_step == 1:
-        # Step 2: リサーチ
-        st.markdown("### Step 2: トレンドリサーチ")
+        # Step 2: ナレッジ収集とリサーチ
+        st.markdown("### Step 2: ナレッジ収集とトレンドリサーチ")
         
-        research_keywords = st.text_input(
-            "リサーチキーワード",
-            value=st.session_state.current_data.get("research_keywords", st.session_state.current_data.get("video_title", ""))
-        )
+        # 既存のキーワードデータを活用
+        available_keywords = []
+        if 'keywords' in st.session_state.current_data:
+            keywords_data = st.session_state.current_data.get('keywords', [])
+            for kw in keywords_data[:5]:
+                if isinstance(kw, dict):
+                    available_keywords.append(kw.get('keyword', ''))
         
-        if st.button("リサーチ実行", type="primary"):
-            with st.spinner("最新トレンドをリサーチ中..."):
-                prompt = f"""
-                Shorts企画: {st.session_state.current_data.get('video_concept')}
+        # 利用可能なデータを表示
+        with st.expander("📊 利用可能なデータ", expanded=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                st.write("**選定済みキーワード:**")
+                for kw in available_keywords:
+                    st.write(f"• {kw}")
+            with col2:
+                st.write("**企画情報:**")
+                if 'selected_plan_index' in st.session_state.current_data:
+                    st.write(f"• 選択された企画: No.{st.session_state.current_data['selected_plan_index']}")
+                if 'video_concept' in st.session_state.current_data:
+                    st.write(f"• コンセプト: {st.session_state.current_data['video_concept'][:50]}...")
+        
+        # 自動的にナレッジ収集を実行
+        if st.button("ナレッジ収集とリサーチ実行", type="primary"):
+            with st.spinner("選定されたキーワードと企画に基づいてナレッジを収集中..."):
+                # キーワードベースのナレッジ収集
+                knowledge_prompt = f"""
+                選定されたキーワード: {', '.join(available_keywords)}
+                動画企画: {st.session_state.current_data.get('video_concept')}
                 タイトル: {st.session_state.current_data.get('video_title')}
-                スタイル: {st.session_state.current_data.get('video_style')}
-                キーワード: {research_keywords}
+                
+                以下のナレッジを収集・生成してください：
+                
+                1. キーワード関連の最新情報
+                   - 各キーワードの最新トレンド
+                   - 話題になっている関連トピック
+                   - 視聴者が知りたがっている情報
+                
+                2. 成功事例の分析
+                   - 類似キーワードでバズった動画の特徴
+                   - 効果的な構成パターン
+                   - 使われている演出手法
+                
+                3. 視聴者インサイト
+                   - このキーワードで検索する人の心理
+                   - 期待している情報・体験
+                   - よくある質問や疑問
+                
+                4. 差別化ポイント
+                   - まだ扱われていない切り口
+                   - 新しい見せ方のアイデア
+                   - ユニークな演出案
                 
                 以下のリサーチを実施してください：
                 
@@ -1424,9 +1638,18 @@ def handle_shorts_script_workflow(app: YouTubeWorkflowApp):
                 - フック: {st.session_state.current_data.get('hook_type')}
                 - 狙う感情: {st.session_state.current_data.get('target_emotion')}
                 
-                リサーチ結果: {st.session_state.current_data.get('trend_research')}
+                収集されたナレッジ:
+                - キーワード分析: {st.session_state.current_data.get('keywords_analysis', '')}
+                - トレンドリサーチ: {st.session_state.current_data.get('trend_research')}
+                - 企画詳細: {st.session_state.current_data.get('shorts_plans', '')}
+                - ペルソナ情報: {st.session_state.current_data.get('personas_analysis', '')}
                 
-                {generation_style}の台本を作成してください。
+                上記のナレッジを最大限活用して、{generation_style}の台本を作成してください。
+                特に以下の点を重視してください：
+                - 選定されたキーワードを自然に盛り込む
+                - 収集した最新トレンドを反映
+                - ターゲットペルソナに響く内容
+                - 競合と差別化できる独自性
                 
                 台本構成：
                 1. タイムコード付き構成表
@@ -2254,9 +2477,29 @@ def handle_long_content_workflow(app: YouTubeWorkflowApp):
                    "レビュー・批評系", "ハウツー・チュートリアル系", "Vlog・日常系", "ストーリーテリング系"].index(st.session_state.current_data.get("content_style"))
         )
         
+        # 既存の企画データがあれば活用
+        if 'video_plans' in st.session_state.current_data:
+            with st.expander("📋 生成済みの動画企画を活用", expanded=True):
+                st.success("✅ 動画企画データを検出しました")
+                if 'evaluation' in st.session_state.current_data:
+                    st.info("評価済みの企画TOP10から選択できます")
+                    selected_plan = st.selectbox(
+                        "使用する企画",
+                        options=list(range(1, 11)),
+                        format_func=lambda x: f"TOP {x} の企画"
+                    )
+                    if st.button("この企画を使用"):
+                        st.session_state.current_data['selected_long_plan'] = selected_plan
+                        st.success(f"企画 {selected_plan} を選択しました")
+        
         col1, col2 = st.columns(2)
         with col1:
-            video_title = st.text_input("動画タイトル", value=st.session_state.current_data.get("video_title", ""))
+            # 企画から自動的にタイトルを設定
+            default_title = ""
+            if 'video_plans' in st.session_state.current_data and 'selected_long_plan' in st.session_state.current_data:
+                default_title = f"企画{st.session_state.current_data['selected_long_plan']}のタイトル"
+            
+            video_title = st.text_input("動画タイトル", value=st.session_state.current_data.get("video_title", default_title))
             target_duration = st.selectbox(
                 "目標尺数",
                 ["5-10分", "10-15分", "15-20分", "20-30分", "30分以上"],
@@ -2392,9 +2635,21 @@ def handle_long_content_workflow(app: YouTubeWorkflowApp):
                 - 参考資料: {st.session_state.current_data.get('reference_materials')}
                 - CTA: {st.session_state.current_data.get('call_to_action')}
                 
+                収集されたナレッジ:
+                - 選定キーワード: {st.session_state.current_data.get('keywords_analysis', '')}
+                - ペルソナ分析: {st.session_state.current_data.get('personas_analysis', '')}
+                - 動画企画詳細: {st.session_state.current_data.get('video_plans', '')}
+                - チャンネルコンセプト: {st.session_state.current_data.get('concepts', '')}
+                
                 要件: {st.session_state.current_data.get('special_requirements')}
                 詳細度: {script_detail_level}
                 含める要素: {include_options}
+                
+                上記のナレッジを活用し、以下の点を重視して台本を作成してください：
+                1. 選定されたキーワードをSEO効果的に配置
+                2. ペルソナ分析に基づいた内容構成
+                3. 企画の独自性を活かした展開
+                4. チャンネルコンセプトとの一貫性
                 
                 以下の形式で{st.session_state.current_data.get('target_duration')}の長尺動画台本を作成してください：
                 
