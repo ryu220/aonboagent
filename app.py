@@ -1,4 +1,13 @@
 import streamlit as st
+
+# Page configuration - Must be first Streamlit command
+st.set_page_config(
+    page_title="YouTube Workflow AI Assistant",
+    page_icon="🎬",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
 import os
 import sys
 from datetime import datetime
@@ -44,14 +53,6 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
-
-# Page configuration
-st.set_page_config(
-    page_title="YouTube Workflow AI Assistant",
-    page_icon="🎬",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
 
 # Initialize session state
 if 'workflow_history' not in st.session_state:
